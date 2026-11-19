@@ -16,7 +16,7 @@ npm start                # o: npm run dev
 npm test                 # 24 pruebas (parser, cálculo de asistencia, integración ADMS)
 ```
 
-Panel: `http://<ip-del-servidor>:8081/`
+Panel: `http://<ip-del-servidor>:8090/`
 
 ## Configurar el biométrico
 
@@ -26,7 +26,7 @@ En el equipo: **Menú → Comunicación → Servidor en la nube / ADMS** (el nom
 |---|---|
 | Modo de servidor | ADMS |
 | Dirección del servidor | IP del PC/servidor donde corre IIT Asistencia |
-| Puerto | `8081` (o el `PORT` del `.env`) |
+| Puerto | `8090` (o el `PORT` del `.env`) |
 | Proxy | Desactivado |
 | HTTPS | Desactivado (usar en LAN o ZeroTier) |
 

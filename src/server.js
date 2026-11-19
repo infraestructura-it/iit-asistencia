@@ -6,6 +6,16 @@ const { createServer } = require('./app');
 const repo = openDb(config.dbPath);
 const server = createServer({ repo, config });
 
+server.on('error', (err) => {
+  if (err.code === 'EADDRINUSE') {
+    console.error(`\n✖ El puerto ${config.port} ya está en uso por otro programa (¿frp, BioTime, IIS?).`);
+    console.error('  Cambia PORT en el archivo .env (ej. PORT=8095) y vuelve a ejecutar npm start.\n');
+  } else {
+    console.error(err);
+  }
+  process.exit(1);
+});
+
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`IIT Asistencia escuchando en http://0.0.0.0:${config.port}`);
   console.log(`  Panel:      http://localhost:${config.port}/`);
