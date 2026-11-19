@@ -9,9 +9,9 @@ const STATUS = { 0: 'entrada', 1: 'salida', 2: 'salida_descanso', 3: 'regreso_de
 
 const TS_RE = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/;
 
-/** Divide el cuerpo en líneas no vacías, tolerando \r\n y \n */
+/** Divide el cuerpo en líneas no vacías, tolerando \r\n, \n y bytes nulos (algunos firmwares rellenan con \0) */
 function lines(body) {
-  return String(body || '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
+  return String(body || '').replace(/\0/g, '').split(/\r?\n/).map((l) => l.trim()).filter(Boolean);
 }
 
 /**
@@ -44,50 +44,93 @@ function parseAttlog(body) {
   return { punches, errors };
 }
 
-/** "KEY=val\tKEY2=val2" -> { KEY: 'val', KEY2: 'val2' } */
+/**
+ * "KEY=val\tKEY2=val2" -> { key: 'val', key2: 'val2' }
+ * Claves en minúscula: según el firmware llegan como PIN/Pin/pin, Card/CardNo/cardno, etc.
+ */
 function parseKv(str) {
   const out = {};
   for (const part of String(str).split('\t')) {
     const i = part.indexOf('=');
-    if (i > 0) out[part.slice(0, i).trim()] = part.slice(i + 1).trim();
+    if (i > 0) out[part.slice(0, i).trim().toLowerCase()] = part.slice(i + 1).trim();
   }
   return out;
 }
 
+const TEMPLATE_KINDS = new Set(['FP', 'FACE', 'BIODATA', 'FVEIN', 'PV', 'BIOPHOTO', 'USERPIC']);
+// Tipos de BIODATA (firmwares push ≥ 2.4: SpeedFace, ProFace, MB-VL, Horus…)
+const BIO_TYPES = { 1: 'huella', 2: 'rostro', 3: 'voz', 4: 'iris', 5: 'retina', 6: 'palma', 7: 'vena', 8: 'palma', 9: 'rostro_vl' };
+
+function userFromKv(kv) {
+  const card = kv.card ?? kv.cardno ?? '';
+  return {
+    pin: kv.pin,
+    name: kv.name || '',
+    privilege: toInt(kv.pri ?? kv.privilege, 0),
+    card: card && card !== '0' ? card : null,
+    groupId: kv.grp || kv.group || null,
+  };
+}
+
 /**
- * OPERLOG / USERINFO: líneas tipo
+ * OPERLOG / USERINFO / BIODATA: líneas tipo
  *   "USER PIN=1\tName=Juan\tPri=0\tPasswd=\tCard=123\tGrp=1\tTZ=..."
  *   "FP PIN=1\tFID=6\tSize=1024\tValid=1\tTMP=..."
+ *   "BIODATA Pin=1\tNo=0\tIndex=0\tValid=1\tType=9\tTmp=..."   (rostro luz visible / palma)
  *   "OPLOG 4\t0\t2026-11-19 08:00:00\t..."
- * Devuelve usuarios, conteo de plantillas y operaciones.
  */
 function parseOperlog(body) {
   const users = [];
   const templates = [];
   const oplogs = [];
   for (const raw of lines(body)) {
-    const sp = raw.indexOf(' ');
-    const kind = sp > 0 ? raw.slice(0, sp).toUpperCase() : raw.toUpperCase();
+    const sp = raw.search(/[ \t]/);
+    const kind = (sp > 0 ? raw.slice(0, sp) : raw).toUpperCase();
     const rest = sp > 0 ? raw.slice(sp + 1) : '';
     if (kind === 'USER') {
       const kv = parseKv(rest);
-      if (kv.PIN) {
-        users.push({
-          pin: kv.PIN,
-          name: kv.Name || '',
-          privilege: toInt(kv.Pri, 0),
-          card: kv.Card && kv.Card !== '0' ? kv.Card : null,
-          groupId: kv.Grp || null,
-        });
-      }
-    } else if (kind === 'FP' || kind === 'FACE' || kind === 'BIODATA') {
+      if (kv.pin) users.push(userFromKv(kv));
+    } else if (TEMPLATE_KINDS.has(kind)) {
       const kv = parseKv(rest);
-      if (kv.PIN) templates.push({ pin: kv.PIN, kind, fid: kv.FID || kv.No || null });
+      if (kv.pin) {
+        const type = kind === 'BIODATA' ? BIO_TYPES[kv.type] || `tipo_${kv.type}` : kind === 'FP' ? 'huella' : kind === 'FACE' ? 'rostro' : kind.toLowerCase();
+        templates.push({ pin: kv.pin, kind, type, fid: kv.fid || kv.no || null });
+      }
     } else if (kind === 'OPLOG') {
       oplogs.push(rest.split('\t'));
     }
   }
   return { users, templates, oplogs };
+}
+
+/**
+ * /iclock/querydata (firmwares push ≥ 2.4 responden así a DATA QUERY):
+ *   tablename=user        → "user uid=1\tpin=1\tname=Ana\tprivilege=0\tcardno=..."
+ *   tablename=ATTLOG/transaction → líneas ATTLOG normales o "transaction pin=1\ttime=2026-11-19 08:00:00..."
+ */
+function parseQueryData(tablename, body) {
+  const t = String(tablename || '').toLowerCase();
+  const users = [];
+  const punches = [];
+  for (const raw of lines(body)) {
+    const sp = raw.search(/[ \t]/);
+    const head = (sp > 0 ? raw.slice(0, sp) : '').toLowerCase();
+    if (head === 'user' || (t === 'user' && raw.includes('='))) {
+      const kv = parseKv(head === 'user' ? raw.slice(sp + 1) : raw);
+      if (kv.pin) users.push(userFromKv(kv));
+    } else if (head === 'transaction' || head === 'attlog' || (raw.includes('=') && t !== 'user')) {
+      const kv = parseKv(sp > 0 && /^[a-z]+$/i.test(head) ? raw.slice(sp + 1) : raw);
+      const ts = kv.time || kv.checktime || kv.datetime;
+      if (kv.pin && TS_RE.test(ts || '')) {
+        const status = toInt(kv.status ?? kv.inoutstate ?? kv.state, 0);
+        const verify = toInt(kv.verify ?? kv.verifytype ?? kv.verified, 0);
+        punches.push({ pin: kv.pin, ts, status, statusLabel: STATUS[status] || `estado_${status}`, verify, verifyLabel: VERIFY[verify] || `metodo_${verify}`, workcode: kv.workcode && kv.workcode !== '0' ? kv.workcode : null });
+      }
+    } else {
+      punches.push(...parseAttlog(raw).punches);
+    }
+  }
+  return { users, punches };
 }
 
 /** Cuerpo de /iclock/devicecmd: "ID=1&Return=0&CMD=DATA\nID=2&Return=-1&CMD=..." */
@@ -116,6 +159,8 @@ function handshakeResponse(sn, { attStamp = 'None', operStamp = 'None', tz = -5,
     `TimeZone=${tz}`,
     `Realtime=${realtime ? 1 : 0}`,
     'Encrypt=None',
+    'ServerVer=2.4.1',
+    'PushProtVer=2.4.1',
   ].join('\n') + '\n';
 }
 
@@ -147,6 +192,8 @@ function toInt(v, def) {
 }
 
 module.exports = {
+  parseQueryData,
+  BIO_TYPES,
   parseAttlog,
   parseOperlog,
   parseKv,

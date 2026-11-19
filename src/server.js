@@ -1,7 +1,9 @@
 'use strict';
 const config = require('./config');
 const { openDb } = require('./db');
-const { createServer } = require('./app');
+const fs = require('node:fs');
+const https = require('node:https');
+const { createServer, createRequestHandler } = require('./app');
 
 const repo = openDb(config.dbPath);
 const server = createServer({ repo, config });
@@ -17,6 +19,17 @@ server.on('error', (err) => {
     console.log(`  Puerto ${port} ocupado, probando ${port + 1}…`);
     port += 1;
     return server.listen(port, '0.0.0.0');
+
+// HTTPS opcional: HTTPS_PORT + TLS_CERT + TLS_KEY en .env
+if (config.httpsPort && config.tlsCert && config.tlsKey) {
+  try {
+    const tls = https.createServer({ cert: fs.readFileSync(config.tlsCert), key: fs.readFileSync(config.tlsKey) }, createRequestHandler({ repo, config }));
+    tls.on('error', (err) => console.error(`✖ HTTPS en puerto ${config.httpsPort}: ${err.message}`));
+    tls.listen(config.httpsPort, '0.0.0.0', () => console.log(`  HTTPS:      puerto ${config.httpsPort} (activa "HTTPS" en el equipo)`));
+  } catch (err) {
+    console.error(`✖ No se pudo leer el certificado TLS: ${err.message}`);
+  }
+}
   }
   if (err.code === 'EADDRINUSE') {
     console.error(`\n✖ El puerto ${port} ya está en uso por otro programa (¿frp, BioTime, IIS?).`);
@@ -36,6 +49,17 @@ server.on('listening', () => {
 });
 
 server.listen(port, '0.0.0.0');
+
+// HTTPS opcional: HTTPS_PORT + TLS_CERT + TLS_KEY en .env
+if (config.httpsPort && config.tlsCert && config.tlsKey) {
+  try {
+    const tls = https.createServer({ cert: fs.readFileSync(config.tlsCert), key: fs.readFileSync(config.tlsKey) }, createRequestHandler({ repo, config }));
+    tls.on('error', (err) => console.error(`✖ HTTPS en puerto ${config.httpsPort}: ${err.message}`));
+    tls.listen(config.httpsPort, '0.0.0.0', () => console.log(`  HTTPS:      puerto ${config.httpsPort} (activa "HTTPS" en el equipo)`));
+  } catch (err) {
+    console.error(`✖ No se pudo leer el certificado TLS: ${err.message}`);
+  }
+}
 
 // Mantenimiento: limpiar bitácora cruda > 30 días
 setInterval(() => repo.pruneRaw(), 6 * 3600000).unref();

@@ -9,11 +9,12 @@ const PUBLIC = path.join(__dirname, '..', 'public');
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml', '.ico': 'image/x-icon' };
 const MAX_BODY = 10 * 1024 * 1024; // lotes grandes de ATTLOG tras días sin red
 
-function createServer({ repo, config, log = console.log }) {
+/** Manejador común para HTTP y HTTPS */
+function createRequestHandler({ repo, config, log = console.log }) {
   const adms = createAdmsHandler({ repo, config, log });
   const api = createApi({ repo, config });
 
-  return http.createServer((req, res) => {
+  return (req, res) => {
     const url = new URL(req.url, 'http://localhost');
     const chunks = [];
     let size = 0;
@@ -23,7 +24,7 @@ function createServer({ repo, config, log = console.log }) {
       chunks.push(c);
     });
     req.on('end', async () => {
-      const body = Buffer.concat(chunks).toString('utf8');
+      const body = decodeBody(Buffer.concat(chunks));
       try {
         if (url.pathname.toLowerCase().startsWith('/iclock')) return await adms(req, res, url, body);
         if (url.pathname.startsWith('/api/')) return await api(req, res, url, body);
@@ -33,7 +34,21 @@ function createServer({ repo, config, log = console.log }) {
         if (!res.headersSent) { res.writeHead(500); res.end(); }
       }
     });
-  });
+  };
+}
+
+function createServer(opts) {
+  return http.createServer(createRequestHandler(opts));
+}
+
+/**
+ * Los firmwares nuevos envían UTF-8; algunos antiguos envían los nombres en Latin-1
+ * (José → "Jos\xe9"). Si el cuerpo no es UTF-8 válido se decodifica como Latin-1.
+ */
+const utf8 = new TextDecoder('utf-8', { fatal: true });
+function decodeBody(buf) {
+  if (!buf.length) return '';
+  try { return utf8.decode(buf); } catch { return buf.toString('latin1'); }
 }
 
 function serveStatic(pathname, res) {
@@ -47,4 +62,4 @@ function serveStatic(pathname, res) {
   fs.createReadStream(file).pipe(res);
 }
 
-module.exports = { createServer };
+module.exports = { createServer, createRequestHandler, decodeBody };

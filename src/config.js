@@ -20,4 +20,8 @@ module.exports = {
   dedupMinutes: Number(process.env.DEDUP_MINUTES ?? 2),
   offlineAfterMin: Number(process.env.OFFLINE_AFTER_MIN ?? 3),
   apiToken: process.env.API_TOKEN || '',
+  // HTTPS opcional (algunos firmwares / BioTime Cloud exigen HTTPS en ADMS)
+  httpsPort: Number(process.env.HTTPS_PORT || 0),
+  tlsCert: process.env.TLS_CERT || '',
+  tlsKey: process.env.TLS_KEY || '',
 };

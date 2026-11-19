@@ -113,6 +113,10 @@ const MIGRATIONS = {
     trans_interval: 'INTEGER NOT NULL DEFAULT 1',
     trans_times: "TEXT NOT NULL DEFAULT '00:00;14:05'",
     attendance: 'INTEGER NOT NULL DEFAULT 1',
+    model: 'TEXT',
+    push_ver: 'TEXT',
+    fp_count: 'INTEGER',
+    face_count: 'INTEGER',
   },
   employees: {
     last_name: "TEXT NOT NULL DEFAULT ''",
@@ -176,6 +180,8 @@ function createRepo(db) {
     resetStamps: db.prepare("UPDATE devices SET att_stamp = 'None', oper_stamp = 'None' WHERE sn = ?"),
     setInfo: db.prepare('UPDATE devices SET firmware = COALESCE(?, firmware), user_count = COALESCE(?, user_count), punch_count = COALESCE(?, punch_count) WHERE sn = ?'),
     setAlias: db.prepare('UPDATE devices SET alias = ? WHERE sn = ?'),
+    setMeta: db.prepare(`UPDATE devices SET model = COALESCE(?1, model), alias = COALESCE(alias, ?1), push_ver = COALESCE(?2, push_ver),
+      fp_count = COALESCE(?3, fp_count), face_count = COALESCE(?4, face_count) WHERE sn = ?5`),
 
     listAreas: db.prepare('SELECT * FROM areas ORDER BY name'),
     createArea: db.prepare('INSERT INTO areas (name) VALUES (?)'),
@@ -278,6 +284,8 @@ function createRepo(db) {
     setDeviceInfo: (sn, { firmware, userCount, punchCount }) =>
       st.setInfo.run(firmware ?? null, userCount ?? null, punchCount ?? null, sn),
     setAlias: (sn, alias) => st.setAlias.run(alias, sn),
+    setDeviceMeta: (sn, { model, pushVer, fpCount, faceCount }) =>
+      st.setMeta.run(model || null, pushVer || null, fpCount ?? null, faceCount ?? null, sn),
 
     // ── Áreas
     listAreas: () => st.listAreas.all(),

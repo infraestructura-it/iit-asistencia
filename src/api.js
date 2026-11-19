@@ -4,6 +4,7 @@ const { commands } = require('./adms/parser');
 const { REPORTS, INCIDENT_TYPES, buildReport, pickColumns, exportReport, holidaysFor } = require('./reports');
 const { colombianHolidays } = require('./holidays-co');
 const { dailyReport } = require('./attendance');
+const compat = require('./compat');
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const TIME_RE = /^([01]\d|2[0-3]):[0-5]\d$/;
@@ -83,7 +84,7 @@ function createApi({ repo, config }) {
   }
 
   const routes = [
-    ['GET', /^\/api\/health$/, () => ({ ok: true, time: new Date().toISOString(), version: '0.2.0' })],
+    ['GET', /^\/api\/health$/, () => ({ ok: true, time: new Date().toISOString(), version: '0.3.0' })],
 
     // ── Tablero
     ['GET', /^\/api\/dashboard$/, () => {
@@ -115,16 +116,22 @@ function createApi({ repo, config }) {
     }],
 
     // ── Equipos
-    ['GET', /^\/api\/devices$/, () => repo.listDevices().map((d) => ({ ...d, online: isOnline(d) }))],
+    ['GET', /^\/api\/devices$/, () => repo.listDevices().map((d) => {
+      const c = compat.matchModel(d.model);
+      return { ...d, online: isOnline(d), compat: c ? { model: c.model, access: c.access, note: c.note } : null };
+    })],
+    ['GET', /^\/api\/compat$/, () => ({ devices: compat.DEVICES, setup: compat.SETUP })],
     ['POST', /^\/api\/devices$/, ({ json }) => {
       const d = validateDevice(json, true);
       if (repo.getDevice(d.sn)) throw httpError(409, 'Ya existe un dispositivo con ese número de serie');
       repo.createDevice(d);
+      if (json.model) repo.setDeviceMeta(d.sn, { model: str(json.model, 60) });
       return repo.getDevice(d.sn);
     }],
     ['PUT', /^\/api\/devices\/([^/]+)$/, ({ m, json }) => {
       if (!repo.getDevice(m[1])) throw httpError(404, 'Equipo no encontrado');
       repo.updateDevice(m[1], validateDevice(json, false));
+      if (json.model) repo.setDeviceMeta(m[1], { model: str(json.model, 60) });
       return repo.getDevice(m[1]);
     }],
     ['PATCH', /^\/api\/devices\/([^/]+)$/, ({ m, json }) => {

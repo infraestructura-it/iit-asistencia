@@ -4,6 +4,7 @@ Servidor de control de asistencia para biométricos **ZKTeco**, pensado como ree
 
 - **Cero dependencias**: Node.js ≥ 22.13 con SQLite integrado (`node:sqlite`). Nada que compilar en Windows.
 - **Protocolo push ADMS ("iclock")**: el biométrico envía las marcaciones él solo, en tiempo real; si se cae la red, las guarda y las reenvía después.
+- **Compatible con la lista de equipos de BioTime Cloud 2.0** (MB, Horus, SpeedFace, ProFace, uFace, serie M…): ver [docs/COMPATIBILIDAD.md](docs/COMPATIBILIDAD.md). HTTPS opcional.
 - **Sin duplicados**: índice único `(equipo, código, fecha/hora)`. El equipo puede reenviar el mismo lote mil veces.
 - **Nunca pierde datos**: cada petición del equipo queda en `raw_log` (30 días) para auditoría.
 - **Panel web estilo BioTime** (HTML/CSS/JS vanilla): módulos Personal, Dispositivo, Asistencia, Reportes y Sistema.
@@ -17,7 +18,7 @@ Servidor de control de asistencia para biométricos **ZKTeco**, pensado como ree
 ```bash
 cp .env.example .env     # ajustar puerto/token si hace falta
 npm start                # o: npm run dev
-npm test                 # 47 pruebas (protocolo, cálculos, festivos, Excel, API, migración)
+npm test                 # 55 pruebas (protocolo, compatibilidad, cálculos, festivos, Excel, API, migración, HTTPS)
 node scripts/seed-demo.js ./data/demo.db   # datos de prueba (BD aparte)
 ```
 

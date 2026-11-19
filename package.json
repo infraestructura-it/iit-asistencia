@@ -1,6 +1,6 @@
 {
   "name": "iit-asistencia",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Servidor de asistencia para biométricos ZKTeco (protocolo push ADMS/iclock). Reemplazo liviano y confiable de ZK BioTime.",
   "main": "src/server.js",
   "type": "commonjs",

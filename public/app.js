@@ -85,6 +85,8 @@
     } else if (f.type === 'days') {
       const on = String(val || '1,2,3,4,5').split(',');
       input = `<div class="days" id="${id}">${[1, 2, 3, 4, 5, 6, 7].map((d) => `<label><input type="checkbox" value="${d}"${on.includes(String(d)) ? ' checked' : ''}>${DAYS[d]}</label>`).join('')}</div>`;
+    } else if (f.type === 'model') {
+      input = `<input id="${id}" name="${f.key}" list="compat-models" value="${esc(val)}" placeholder="Ej. SpeedFace-V5L"><datalist id="compat-models">${(cache.compat ? cache.compat.devices : []).map((d) => `<option value="${esc(d.model)}">`).join('')}</datalist>`;
     } else if (f.type === 'checkbox') {
       input = `<label><input type="checkbox" id="${id}" name="${f.key}"${val ? ' checked' : ''}> ${esc(f.text || '')}</label>`;
     } else {
@@ -327,8 +329,10 @@
   // ── Dispositivos
   pages.devices = async (root) => {
     const c = await catalogs();
+    cache.compat = cache.compat || (await api('/api/compat'));
     const fields = (isNew) => [
       { key: 'alias', label: 'Nombre del dispositivo', req: true, placeholder: 'Ej. M2 Pro Portería' },
+      { key: 'model', label: 'Modelo', type: 'model', hint: 'Se detecta solo al conectarse; puedes escribirlo' },
       { key: 'attendance', label: 'Asistencia', type: 'select', options: [{ value: 1, label: 'Sí' }, { value: 0, label: 'No' }] },
       { key: 'sn', label: 'Número de serie', req: true, readonly: !isNew, hint: isNew ? 'Menú del equipo → Info del sistema' : '' },
       { key: 'ip', label: 'Dirección IP', placeholder: '192.168.40.57' },
@@ -369,13 +373,38 @@
       { label: 'Reiniciar', danger: true, needSel: 2, run: async (s) => { if (await confirmBox('Reiniciar equipo', '¿Reiniciar el biométrico? Estará fuera de servicio ~1 minuto.', 'Reiniciar')) await cmd('reboot')(s); } },
     ] });
     p.bind(grid(p.gridEl, { rows: c.devices, key: 'sn', onOpen: edit, empty: 'Ningún equipo todavía. Usa "Nuevo" o configura el biométrico (ver Sistema → Configurar equipo).', columns: [
-      { key: 'sn', label: 'Número de serie' }, { key: 'alias', label: 'Nombre del dispositivo' }, { key: 'area', label: 'Área' },
+      { key: 'sn', label: 'Número de serie' }, { key: 'alias', label: 'Nombre del dispositivo' },
+      { key: 'model', label: 'Modelo', render: (r) => esc(r.model || '—') + (r.compat ? ` <span class="tag ok" title="${esc(r.compat.note || 'En la lista de compatibilidad')}">compatible</span>` : r.model ? ' <span class="tag warn" title="No está en la lista; puede funcionar si tiene ADMS">sin verificar</span>' : '') + (r.compat && r.compat.access ? ' <span class="tag info" title="Equipo de acceso: debe estar en modo T&amp;A PUSH">T&amp;A PUSH</span>' : '') },
+      { key: 'push_ver', label: 'Push' }, { key: 'area', label: 'Área' },
       { key: 'ip', label: 'Dirección IP' },
       { key: 'online', label: 'Estado', render: (r) => (r.online ? '<span class="tag ok">En línea</span>' : r.last_seen ? '<span class="tag bad">Desconectado</span>' : '<span class="tag gray">Sin contacto</span>') },
       { key: 'last_seen', label: 'Última conexión (UTC)' }, { key: 'firmware', label: 'Firmware' },
-      { key: 'user_count', label: 'Usuarios', cls: 'num' }, { key: 'punch_count', label: 'Transacciones', cls: 'num' },
+      { key: 'user_count', label: 'Usuarios', cls: 'num' }, { key: 'fp_count', label: 'Huellas', cls: 'num' }, { key: 'face_count', label: 'Rostros', cls: 'num' },
+      { key: 'punch_count', label: 'Transacciones', cls: 'num' },
       { key: 'attendance', label: 'Asistencia', render: (r) => yesNo(r.attendance) },
     ] }));
+  };
+
+  // ── Equipos compatibles
+  pages.compat = async (root) => {
+    cache.compat = cache.compat || (await api('/api/compat'));
+    const devs = await api('/api/devices');
+    const { devices, setup } = cache.compat;
+    const connected = (m) => devs.some((d) => d.compat && d.compat.model === m);
+    root.innerHTML = `<div class="help" style="max-width:none;margin-bottom:10px">
+      <h3>Cómo conectar cualquier equipo de la lista</h3>
+      <ol>${setup.general.map((x) => `<li>${esc(x)}</li>`).join('')}</ol>
+      <p><span class="tag info">T&amp;A PUSH</span> ${esc(setup.access)}</p>
+      <p style="color:var(--muted)">Requisitos: ADMS habilitado y firmware 2019 o posterior. Fuente: Lista de compatibilidad BioTime Cloud 2.0 (ZKTeco Colombia, oct-2024). Un equipo que no esté en la lista puede funcionar si tiene ADMS / Servidor en la nube.</p>
+    </div><div class="card"><div class="toolbar"><span class="grow"></span><input type="search" data-search placeholder="Buscar modelo…" size="22"></div><div data-grid></div></div>`;
+    const g = grid($('[data-grid]', root), { rows: devices, key: 'model', selectable: false, columns: [
+      { key: 'model', label: 'Modelo', render: (r) => esc(r.model) + (r.series ? ' <small style="color:var(--muted)">(serie)</small>' : '') },
+      { key: 'family', label: 'Familia' },
+      { key: 'access', label: 'Configuración', render: (r) => (r.access ? '<span class="tag info">Cambiar a T&amp;A PUSH</span>' : '<span class="tag gray">Directo (ADMS)</span>') },
+      { key: 'status', label: 'Estado en IIT', render: (r) => (connected(r.model) ? '<span class="tag ok">Conectado aquí</span>' : r.tested ? '<span class="tag ok">Probado</span>' : '<span class="tag gray">Por probar</span>') },
+      { key: 'note', label: 'Nota' },
+    ] });
+    $('[data-search]', root).oninput = (ev) => g.search(ev.target.value);
   };
 
   // ── Comandos
@@ -638,7 +667,7 @@
   const MODULES = [
     { id: 'home', label: 'Inicio', menu: [['Inicio', [['dashboard', 'Tablero']]]] },
     { id: 'personal', label: 'Personal', menu: [['Personal', [['employees', 'Empleados'], ['departments', 'Departamentos'], ['areas', 'Áreas']]]] },
-    { id: 'device', label: 'Dispositivo', menu: [['Dispositivo', [['devices', 'Dispositivos'], ['commands', 'Comandos de dispositivo'], ['rawlog', 'Datos recibidos']]]] },
+    { id: 'device', label: 'Dispositivo', menu: [['Dispositivo', [['devices', 'Dispositivos'], ['commands', 'Comandos de dispositivo'], ['rawlog', 'Datos recibidos']]], ['Ayuda', [['compat', 'Equipos compatibles']]]] },
     { id: 'att', label: 'Asistencia', menu: [['Reglas', [['schedules', 'Horarios'], ['holidays', 'Festivos']]], ['Novedades', [['incidents', 'Novedades'], ['manual', 'Marcación manual']]], ['Datos', [['rep-transactions', 'Transacciones']]]] },
     { id: 'reports', label: 'Reportes', menu: [['Reportes', [
       ['rep-daily', 'Asistencia diaria'], ['rep-firstlast', 'Primera y última'], ['rep-summary', 'Resumen por empleado'], ['rep-late', 'Llegadas tarde'],
