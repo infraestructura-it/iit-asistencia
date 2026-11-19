@@ -14,6 +14,7 @@ loadEnv();
 
 module.exports = {
   port: Number(process.env.PORT || 8090),
+  portExplicit: Boolean(process.env.PORT),
   dbPath: process.env.DB_PATH || path.join(__dirname, '..', 'data', 'asistencia.db'),
   deviceTz: Number(process.env.DEVICE_TZ ?? -5),
   dedupMinutes: Number(process.env.DEDUP_MINUTES ?? 2),
