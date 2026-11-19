@@ -32,6 +32,10 @@ En el equipo: **Menú → Comunicación → Servidor en la nube / ADMS** (el nom
 
 A los pocos segundos el equipo aparece en la pestaña **Equipos**. Usa **Traer usuarios** para cargar los nombres y **Re-descargar marcaciones** para recuperar historial del rango elegido.
 
+**Equipo de referencia:** ZKTeco **M2 Pro** (serie UFS2255100650), LAN 192.168.40.57, hoy conectado a BioTime 8.x. Los parámetros que IIT Asistencia le envía (intervalo de solicitud 10 s, transferencia 1 min, horas `00:00;14:05`) son los mismos que tiene configurados en BioTime.
+
+> ⚠️ **Zona horaria:** en la notación IANA, `Etc/GMT-5` significa **UTC+5** (el signo va al revés). Colombia es `Etc/GMT+5` / `America/Bogota`. IIT Asistencia le envía al equipo `TimeZone=-5` y toma la hora tal como la marca el equipo, sin conversiones.
+
 > Un equipo solo puede apuntar a un servidor push a la vez: al cambiarlo, BioTime deja de recibir. Probar primero con un solo equipo.
 
 ## Arquitectura
