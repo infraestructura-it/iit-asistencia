@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>IIT Asistencia</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>IIT <span>Asistencia</span></h1>
+    <nav>
+      <button data-tab="report" class="active">Asistencia</button>
+      <button data-tab="punches">Marcaciones</button>
+      <button data-tab="employees">Empleados</button>
+      <button data-tab="devices">Equipos</button>
+    </nav>
+  </header>
+
+  <section class="filters">
+    <label>Desde <input type="date" id="from"></label>
+    <label>Hasta <input type="date" id="to"></label>
+    <label>Código <input type="text" id="pin" placeholder="todos" size="8"></label>
+    <button id="refresh">Consultar</button>
+    <a id="csv" class="btn ghost" href="#">Exportar CSV</a>
+  </section>
+
+  <main>
+    <section id="tab-report" class="tab active"><div class="stats" id="stats"></div><table id="t-report"></table></section>
+    <section id="tab-punches" class="tab"><table id="t-punches"></table></section>
+    <section id="tab-employees" class="tab"><table id="t-employees"></table></section>
+    <section id="tab-devices" class="tab"><div id="devices" class="cards"></div></section>
+  </main>
+
+  <div id="toast"></div>
+  <script src="app.js"></script>
+</body>
+</html>
