@@ -102,19 +102,19 @@ function parseDeviceCmdResults(body) {
 }
 
 /** Respuesta al handshake inicial GET /iclock/cdata?SN=...&options=all */
-function handshakeResponse(sn, { attStamp = 'None', operStamp = 'None', tz = -5 } = {}) {
+function handshakeResponse(sn, { attStamp = 'None', operStamp = 'None', tz = -5, delay = 10, transInterval = 1, transTimes = '00:00;14:05', realtime = true } = {}) {
   return [
     `GET OPTION FROM: ${sn}`,
     `ATTLOGStamp=${attStamp}`,
     `OPERLOGStamp=${operStamp}`,
     'ATTPHOTOStamp=None',
     'ErrorDelay=30',
-    'Delay=10',
-    'TransTimes=00:00;14:05',
-    'TransInterval=1',
+    `Delay=${delay}`,
+    `TransTimes=${transTimes}`,
+    `TransInterval=${transInterval}`,
     'TransFlag=TransData AttLog OpLog EnrollUser ChgUser EnrollFP ChgFP',
     `TimeZone=${tz}`,
-    'Realtime=1',
+    `Realtime=${realtime ? 1 : 0}`,
     'Encrypt=None',
   ].join('\n') + '\n';
 }

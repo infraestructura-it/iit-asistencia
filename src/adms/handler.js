@@ -20,7 +20,11 @@ function createAdmsHandler({ repo, config, log = () => {} }) {
         repo.raw(sn, 'cdata:handshake', url.search, null);
         const d = repo.getDevice(sn);
         log(`[adms] handshake ${sn} (${ip})`);
-        return text(res, P.handshakeResponse(sn, { attStamp: d.att_stamp, operStamp: d.oper_stamp, tz: config.deviceTz }));
+        return text(res, P.handshakeResponse(sn, {
+          attStamp: d.att_stamp, operStamp: d.oper_stamp,
+          tz: d.timezone ?? config.deviceTz, delay: d.delay ?? 10,
+          transInterval: d.trans_interval ?? 1, transTimes: d.trans_times || '00:00;14:05',
+        }));
       }
 
       if (route === '/cdata' && req.method === 'POST') {

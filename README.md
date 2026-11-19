@@ -6,14 +6,19 @@ Servidor de control de asistencia para biométricos **ZKTeco**, pensado como ree
 - **Protocolo push ADMS ("iclock")**: el biométrico envía las marcaciones él solo, en tiempo real; si se cae la red, las guarda y las reenvía después.
 - **Sin duplicados**: índice único `(equipo, código, fecha/hora)`. El equipo puede reenviar el mismo lote mil veces.
 - **Nunca pierde datos**: cada petición del equipo queda en `raw_log` (30 días) para auditoría.
-- **Panel web** (HTML/CSS/JS vanilla): asistencia diaria, marcaciones, empleados, estado de equipos, exportar a CSV (Excel).
+- **Panel web estilo BioTime** (HTML/CSS/JS vanilla): módulos Personal, Dispositivo, Asistencia, Reportes y Sistema.
+- **Horarios** diurnos y nocturnos, tolerancia, descanso y días laborables; **festivos de Colombia** automáticos (Ley Emiliani).
+- **Novedades**: vacaciones, incapacidad, permiso, licencia, calamidad, comisión. **Marcación manual** con motivo obligatorio.
+- **8 reportes** con columnas elegibles y ordenables: asistencia diaria, primera/última, resumen para nómina, tardanzas,
+  horas extra, ausencias, novedades y transacciones. Exporta a **Excel (.xlsx), PDF, TXT y CSV**.
 
 ## Arranque rápido
 
 ```bash
 cp .env.example .env     # ajustar puerto/token si hace falta
 npm start                # o: npm run dev
-npm test                 # 24 pruebas (parser, cálculo de asistencia, integración ADMS)
+npm test                 # 47 pruebas (protocolo, cálculos, festivos, Excel, API, migración)
+node scripts/seed-demo.js ./data/demo.db   # datos de prueba (BD aparte)
 ```
 
 Panel: `http://<ip-del-servidor>:8090/`
@@ -51,22 +56,18 @@ Panel web ──────HTTP/JSON────▶ /api/*     ─┘
 | `src/adms/parser.js` | Parser puro del protocolo: ATTLOG, OPERLOG/USERINFO, comandos, handshake |
 | `src/adms/handler.js` | Endpoints `/iclock/cdata`, `/getrequest`, `/devicecmd` |
 | `src/db.js` | Esquema y consultas SQLite |
-| `src/attendance.js` | Deduplicación, reporte diario (entrada/salida/horas), CSV |
+| `src/attendance.js` | Deduplicación, jornadas, tardanzas, extras, nocturnos, ausencias, resumen |
+| `src/reports.js` | Catálogo de reportes, columnas y exportación |
+| `src/holidays-co.js` | Festivos de Colombia calculados por año |
+| `src/xlsx.js` | Escritor .xlsx sin dependencias |
 | `src/api.js` | API REST del panel |
 | `public/` | Panel web |
 
-### API
+### API (resumen)
 
-| Método | Ruta | Descripción |
-|---|---|---|
-| GET | `/api/devices` | Equipos con estado en línea |
-| PATCH | `/api/devices/:sn` | `{ alias }` |
-| POST | `/api/devices/:sn/commands` | `{ type: info \| check \| reboot \| queryUsers \| queryAttlog, from, to }` |
-| GET | `/api/employees` | Empleados |
-| PATCH | `/api/employees/:pin` | `{ name, department, active }` |
-| POST | `/api/employees/:pin/push` | Envía el empleado a todos los equipos (o `{ sn }`) |
-| GET | `/api/punches?from&to&pin[&format=csv]` | Marcaciones |
-| GET | `/api/report/daily?from&to&pin[&format=csv]` | Asistencia diaria |
+`/api/dashboard` · `/api/devices` (CRUD + `/commands`) · `/api/employees` (CRUD + `/push`, `/sync`) · `/api/departments` ·
+`/api/areas` · `/api/schedules` · `/api/incidents` · `/api/holidays` · `/api/punches` (manual) ·
+`/api/reports` y `/api/reports/:tipo?from&to&department&pin&cols&format=xlsx|txt|csv`
 
 Con `API_TOKEN` en `.env`, la API exige `Authorization: Bearer <token>`. Los endpoints del biométrico (`/iclock`) no usan token.
 
@@ -74,12 +75,21 @@ Con `API_TOKEN` en `.env`, la API exige `Authorization: Bearer <token>`. Los end
 
 - Marcaciones del mismo empleado a menos de `DEDUP_MINUTES` (2 por defecto) cuentan como una.
 - Las marcaciones del día se emparejan en orden (1ª-2ª, 3ª-4ª…): soporta almuerzo sin depender del botón de estado del equipo.
+- Si solo hay 2 marcaciones y la jornada pasa de 5 h, se descuenta el descanso del horario.
+- Tardanza: minutos después de la entrada **solo si superan la tolerancia**.
+- Horas extra: trabajado − (salida − entrada − descanso). En **festivos** todo lo trabajado es extra.
+- Turno nocturno (salida < entrada): las marcaciones hasta 4 h después de la salida cuentan para el día de entrada.
+- Ausencia: día laborable sin marcación, sin novedad, no festivo, posterior al ingreso y no futuro.
 - Número impar de marcaciones → jornada **incompleta** (resaltada en el panel).
 
 ## Hoja de ruta
 
-- [ ] Migración desde la base de datos de BioTime (empleados + historial)
-- [ ] Modo *pull* (TCP 4370) para equipos sin ADMS
-- [ ] Horarios/turnos, retardos, horas extra y festivos de Colombia
+- [x] Horarios, tardanzas, extras, nocturnos, festivos de Colombia, novedades, reportes Excel/PDF/TXT
+- [ ] Importar personal e historial exportados de BioTime
+- [ ] Turnos rotativos y por ciclos
+- [ ] Flujo de aprobación de permisos
+- [ ] App móvil con geocerca (marcación remota)
+- [ ] Recargos según legislación colombiana (nocturno, dominical/festivo)
+- [ ] Usuarios y roles en el panel
 - [ ] Servicio de Windows / PM2 y respaldo automático de la BD
-- [ ] Sincronización opcional a Supabase
+- [ ] Modo *pull* (TCP 4370) para equipos sin ADMS

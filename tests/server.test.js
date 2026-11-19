@@ -66,7 +66,7 @@ test('API: reporte diario y CSV', async () => {
   const juan = rows.find((r) => r.pin === '1');
   assert.equal(juan.worked, '10:00');
   assert.equal(juan.name, 'Juan');
-  const csv = await fetch(`${base}/api/report/daily?from=2026-11-19&format=csv`);
+  const csv = await fetch(`${base}/api/reports/daily?from=2026-11-19&format=csv`);
   assert.match(csv.headers.get('content-type'), /text\/csv/);
   assert.match(await csv.text(), /Juan/);
 });

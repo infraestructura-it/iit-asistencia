@@ -4,35 +4,40 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>IIT Asistencia</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@600;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
-  <header>
-    <h1>IIT <span>Asistencia</span></h1>
-    <nav>
-      <button data-tab="report" class="active">Asistencia</button>
-      <button data-tab="punches">Marcaciones</button>
-      <button data-tab="employees">Empleados</button>
-      <button data-tab="devices">Equipos</button>
-    </nav>
+  <header class="topbar">
+    <div class="brand"><span class="logo">IIT</span><span class="product">Asistencia</span></div>
+    <nav id="modules"></nav>
+    <div class="top-right">
+      <span id="dev-status" class="dev-status" title="Estado de equipos"></span>
+      <span class="clock" id="clock"></span>
+    </div>
   </header>
 
-  <section class="filters">
-    <label>Desde <input type="date" id="from"></label>
-    <label>Hasta <input type="date" id="to"></label>
-    <label>Código <input type="text" id="pin" placeholder="todos" size="8"></label>
-    <button id="refresh">Consultar</button>
-    <a id="csv" class="btn ghost" href="#">Exportar CSV</a>
-  </section>
+  <div class="layout">
+    <aside class="sidebar" id="sidebar"></aside>
+    <main class="content">
+      <div class="page-tab"><span id="page-title"></span></div>
+      <div id="page"></div>
+    </main>
+  </div>
 
-  <main>
-    <section id="tab-report" class="tab active"><div class="stats" id="stats"></div><table id="t-report"></table></section>
-    <section id="tab-punches" class="tab"><table id="t-punches"></table></section>
-    <section id="tab-employees" class="tab"><table id="t-employees"></table></section>
-    <section id="tab-devices" class="tab"><div id="devices" class="cards"></div></section>
-  </main>
+  <div class="modal-back" id="modal-back">
+    <div class="modal" role="dialog" aria-modal="true">
+      <div class="modal-head"><h3 id="modal-title"></h3><button class="x" id="modal-close" aria-label="Cerrar">×</button></div>
+      <form id="modal-form" novalidate>
+        <div class="modal-body" id="modal-body"></div>
+        <div class="modal-error" id="modal-error"></div>
+        <div class="modal-foot">
+          <button type="submit" class="btn primary" id="modal-ok">Confirmar</button>
+          <button type="button" class="btn" id="modal-cancel">Cancelar</button>
+        </div>
+      </form>
+    </div>
+  </div>
 
   <div id="toast"></div>
   <script src="app.js"></script>
