@@ -304,7 +304,7 @@ function createRepo(db) {
       tx(() => {
         let inserted = 0;
         for (const p of punches) {
-          const r = st.insertPunch.run(sn, p.pin, p.ts, p.status, p.verify, p.workcode, 'device', null);
+          const r = st.insertPunch.run(sn, p.pin, p.ts, p.status ?? 0, p.verify ?? 0, p.workcode ?? null, 'device', null);
           if (r.changes) {
             inserted++;
             st.ensureEmployee.run(p.pin);
